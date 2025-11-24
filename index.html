@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Парк Олександрія — Інтерактивна карта</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
+<style>
+body { margin:0; font-family: Arial; }
+#map { height: 100vh; width: calc(100% - 260px); margin-left: 260px; }
+#menu {
+  position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+  background: #fff; padding: 15px; overflow-y: auto;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.15);
+}
+.route-btn { padding:10px; margin-bottom:10px; background:#f4f4f4; border:1px solid #ccc; border-radius:6px; cursor:pointer;}
+.route-active { background:#cde7ff !important; }
+select { width:100%; padding:8px; margin-bottom:15px; border-radius:6px; border:1px solid #bbb; }
+</style>
+</head>
+<body>
+<div id="menu">
+<h3>Маршрути / Routes</h3>
+<div id="btn1" class="route-btn">Оглядовий / Overview</div>
+<div id="btn2" class="route-btn">Історичний / Historical</div>
+<div id="btn3" class="route-btn">Ландшафтний / Landscape</div>
+<h3>Мова / Language</h3>
+<select id="lang" onchange="switchLang()">
+  <option value="ua">Українська</option>
+  <option value="en">English</option>
+</select>
+</div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.locatecontrol/dist/L.Control.Locate.min.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+
+<script>
+// ====== КАРТА ======
+const map = L.map('map').setView([49.8146, 30.0776], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+L.control.locate({ position:'topleft', setView:true, drawCircle:true, locateOptions:{enableHighAccuracy:true}}).addTo(map);
+
+// ====== ОПИСИ ======
+const descriptions = {
+"Головний вхід":"Головний вхід до парку Олександрія був зведений у XIX столітті та слугував парадним входом для відвідувачів. Він прикрашений класичними колоннами та скульптурними елементами. Тут починається центральна алея, що веде до ключових історичних споруд парку.",
+"Головна алея":"Центральна алея парку була задумана як головна вісь композиції. Уздовж неї розташовані скульптури та декоративні клумби. Алейна структура створює величний вигляд і підкреслює гармонію ландшафту.",
+"Північний вхід":"Північний вхід слугував другорядним доступом до парку і мав спокійніший характер. Його архітектура відповідає стилю XIX століття та добре інтегрується з природним ландшафтом.",
+"Дидинець":"Дидинець – історична частина парку, де раніше знаходилися фортифікаційні споруди. Сьогодні це мальовниче урочище для прогулянок і відпочинку. Його природний рельєф та старі дерева створюють атмосферу давнини.",
+"Композиція Варна":"Декоративна композиція «Варна» була встановлена у середині XIX століття як прикраса парку. Скульптури та рослинність утворюють гармонійний ансамбль, який залучає відвідувачів до фотографій і прогулянок.",
+"Колона смутку Пелікан":"Колона смутку «Пелікан» є символом романтичного мистецтва парку. Її встановили на початку XX століття, і вона стала популярним місцем для прогулянок та фотосесій.",
+"Ротонда":"Ротонда – білосніжна альтанка класичного стилю з прекрасним краєвидом на парк. Вона була зведена для відпочинку гостей і організації культурних заходів.",
+"Пам'ятний знак":"Пам'ятний знак встановлено на честь визначних подій, пов’язаних з історією парку та міста. Його композиція привертає увагу та формує історичну пам’ять.",
+"Джерело Лев":"Декоративне джерело з фігурою лева створено для естетичного та символічного підкреслення водних елементів парку. Лев уособлює силу та велич.",
+"Колонада Луна":"Колонада Луна – головний символ парку, побудована у класичному стилі. Вона розташована над ставом і створює мальовничі віддзеркалення у воді.",
+"Велика галявина":"Велика галявина є найбільшою відкритою частиною парку. Тут проводилися громадські заходи та фестивалі, а сьогодні це популярне місце для відпочинку та прогулянок.",
+"Китайський місток":"Китайський місток прикрашає парк у східному стилі. Його екзотичні елементи надають ландшафту особливого шарму та елегантності.",
+"Арочний місток":"Кам’яний арочний міст додає парку романтичності. Його архітектура нагадує класичні європейські пейзажі XIX століття.",
+"Турецький будиночок":"Турецький будиночок був побудований як декоративна споруда у східному стилі. Він слугував для відпочинку та фотосесій гостей парку.",
+"Колона Енса":"Колона на честь графа Енса встановлена у XIX столітті. Вона символізує значущу історичну постать, пов’язану з розвитком парку.",
+"Руїни":"Романтичні руїни створені для додання парку особливої атмосфери давнини. Вони імітують залишки старих будівель і фортифікацій.",
+"Колона Глобус":"Колона Глобус встановлена як символ наукових і географічних досягнень епохи. Вона часто стає місцем для екскурсій та фотографій.",
+"Альтанка Новопарк":"Альтанка Новопарк – затишна конструкція для відпочинку серед дерев і зелені. Вона допомагає створити камерну атмосферу для відвідувачів.",
+"Дирекція парку":"Дирекція парку виконує функції адміністрації та музею історії. Будівля зберегла класичні риси архітектури XIX століття.",
+"Стара гребля":"Стара гребля – історична водна споруда, що регулювала рівень ставу. Вона демонструє технічні досягнення попередніх століть.",
+"Нагірна галявина":"Нагірна галявина розташована на підвищенні, звідки відкривається панорамний вид на весь парк. Це популярне місце для фотозйомки.",
+"Палієва гора":"Палієва гора – найвища точка парку. З неї відкриваються чудові краєвиди, а місце має давню історичну символіку.",
+"Горіхова галявина":"Горіхова галявина оточена старими горіховими деревами. Тут збереглася первісна атмосфера парку і природний ландшафт.",
+"Мала галявина":"Мала галявина – компактна затишна галявина для відпочинку. Вона часто використовується для невеликих заходів та прогулянок.",
+"В’їзд у парк":"В’їзд у парк слугує сервісною зоною та контролю доступу. Архітектура зберігає історичні риси паркового стилю.",
+"Сад Мур":"Сад Мур – історичний декоративний сад із старовинними рослинами та алейками. Його композиція підкреслює романтичний характер парку."
+};
+
+// ====== ОПИСИ АНГ ======
+const descriptions_en = {
+"Головний вхід":"The main entrance to Alexandria Park was built in the 19th century and served as the ceremonial gateway for visitors. It is decorated with classical columns and sculptural elements. The main alley begins here, leading to the key historical structures of the park.",
+"Головна алея":"The park’s main alley was designed as the central axis of the composition. Sculptures and decorative flowerbeds line its sides. The alley creates a majestic view and emphasizes the harmony of the landscape.",
+"Північний вхід":"The northern entrance served as a secondary access to the park and has a calmer character. Its architecture reflects the 19th-century style and integrates well with the natural landscape.",
+"Дидинець":"Didynets is a historic part of the park, formerly housing fortification structures. Today, it serves as a scenic spot for walks and recreation. Its natural relief and old trees create an ancient atmosphere.",
+// ...додати решту англійських описів аналогічно
+};
+
+// ====== ТОЧКИ ======
+const points = {
+"Головний вхід":[49.8140,30.0755],
+"Головна алея":[49.8145,30.0768],
+"Північний вхід":[49.8162,30.0791],
+"Дидинець":[49.8151,30.0782],
+"Композиція Варна":[49.8156,30.0779],
+"Колона смутку Пелікан":[49.8152,30.0787],
+"Ротонда":[49.8150,30.0795],
+"Пам'ятний знак":[49.8144,30.0762],
+"Джерело Лев":[49.8138,30.0793],
+"Колонада Луна":[49.8149,30.0789],
+"Велика галявина":[49.8153,30.0780],
+"Китайський місток":[49.8158,30.0797],
+"Арочний місток":[49.8161,30.0802],
+"Турецький будиночок":[49.8163,30.0808],
+"Колона Енса":[49.8172,30.0810],
+"Руїни":[49.8165,30.0799],
+"Колона Глобус":[49.8169,30.0815],
+"Альтанка Новопарк":[49.8170,30.0786],
+"Дирекція парку":[49.8141,30.0760],
+"Стара гребля":[49.8132,30.0787],
+"Нагірна галявина":[49.8180,30.0790],
+"Палієва гора":[49.8185,30.0794],
+"Горіхова галявина":[49.8177,30.0781],
+"Мала галявина":[49.8179,30.0775],
+"В’їзд у парк":[49.8137,30.0751],
+"Сад Мур":[49.8168,30.0770]
+};
+
+// ====== МОВА ======
+let currentLang="ua";
+function switchLang(){currentLang=document.getElementById("lang").value; renderMarkers();}
+
+// ====== МАРКЕРИ ======
+let markerLayer=L.layerGroup().addTo(map);
+function getDescription(name){return currentLang==="ua"?descriptions[name]:descriptions_en[name];}
+function renderMarkers(){
+  markerLayer.clearLayers();
+  for(let name in points){
+    L.marker(points[name]).addTo(markerLayer).bindPopup(`
+      <b>${name}</b><br>
+      ${getDescription(name)}<br><br>
+      <button onclick="routeTo('${name}')">🧭 Навігація</button>
+    `);
+  }
+}
+renderMarkers();
+
+// ====== НАВІГАЦІЯ ======
+let router=null;
+function routeTo(name){
+  if(router) map.removeControl(router);
+  navigator.geolocation.getCurrentPosition(pos=>{
+    router=L.Routing.control({
+      waypoints:[L.latLng(pos.coords.latitude,pos.coords.longitude), L.latLng(points[name][0],points[name][1])],
+      lineOptions:{styles:[{color:'orange',weight:5}]},
+      addWaypoints:false, draggableWaypoints:false, showAlternatives:false
+    }).addTo(map);
+  });
+}
+
+// ====== МАРШРУТИ ======
+const route1=[points["Головний вхід"],points["Головна алея"],points["Колонада Луна"],points["Ротонда"],points["Велика галявина"]];
+const route2=[points["Головний вхід"],points["Пам'ятний знак"],points["Колона смутку Пелікан"],points["Композиція Варна"],points["Китайський місток"],points["Турецький будиночок"],points["Руїни"],points["Джерело Лев"],points["Стара гребля"]];
+const route3=[points["Північний вхід"],points["Нагірна галявина"],points["Палієва гора"],points["Горіхова галявина"],points["Мала галявина"],points["Альтанка Новопарк"],points["Сад Мур"],points["Дидинець"],points["Колона Енса"],points["Колона Глобус"]];
+
+let activeRoute=null;
+function showRoute(pointsArray, btnId){
+  if(activeRoute) map.removeControl(activeRoute);
+  activeRoute=L.Routing.control({
+    waypoints: pointsArray.map(p=>L.latLng(p[0],p[1])),
+    lineOptions:{styles:[{color:'blue',weight:5}]},
+    addWaypoints:false,
+    draggableWaypoints:false,
+    showAlternatives:false
+  }).addTo(map);
+
+  document.querySelectorAll('.route-btn').forEach(b=>b.classList.remove('route-active'));
+  document.getElementById(btnId).classList.add('route-active');
+}
+
+// Прив’язка кнопок
+document.getElementById("btn1").onclick=()=>showRoute(route1,"btn1");
+document.getElementById("btn2").onclick=()=>showRoute(route2,"btn2");
+document.getElementById("btn3").onclick=()=>showRoute(route3,"btn3");
+</script>
+</body>
+</html>
